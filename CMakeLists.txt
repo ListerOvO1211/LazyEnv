@@ -151,6 +151,9 @@ add_custom_command(TARGET LazyEnv POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/resources/i18n.js"
         "$<TARGET_FILE_DIR:LazyEnv>/resources/i18n.js"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons.js"
+        "$<TARGET_FILE_DIR:LazyEnv>/resources/icons.js"
     COMMENT "Copying web resources to output directory"
 )
 

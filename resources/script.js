@@ -464,9 +464,9 @@
             if (!groups[cat]) return;
             html += '<div class="card-section"><div class="card-section__title">' + esc(getCategoryLabel(cat)) + ' (' + groups[cat].length + ')</div>';
             groups[cat].forEach(function (e) {
-                var initials = e.name.substring(0, 2).toUpperCase();
+                var iconSvg = window.LazyEnvIcons.getIcon(e.command || e.name, e.category);
                 html += '<div class="card-row" data-cmd="' + esc(e.command) + '">' +
-                    '<div class="card-row__icon card-row__icon--' + esc(e.category) + '">' + initials + '</div>' +
+                    '<div class="card-row__icon">' + iconSvg + '</div>' +
                     '<div class="card-row__body">' +
                     '<div class="card-row__title">' + esc(e.name) + '</div>' +
                     '<div class="card-row__subtitle">' + esc(e.version) + '</div>' +
@@ -800,10 +800,12 @@
             html += '<div class="card-section"><div class="card-section__title">' + esc(getCategoryLabel(cat)) + '</div>';
             groups[cat].forEach(function (p) {
                 var sel = selectedPackages.has(p.id);
+                var iconSvg = window.LazyEnvIcons.getIcon(p.id || p.name, p.category);
                 html += '<div class="card-row card-row--selectable' + (sel ? ' card-row--selected' : '') + '" data-id="' + esc(p.id) + '">' +
                     '<div class="card-row__check">' +
                     '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' +
                     '</div>' +
+                    '<div class="card-row__icon">' + iconSvg + '</div>' +
                     '<div class="card-row__body">' +
                     '<div class="card-row__title">' + esc(p.name) + '</div>' +
                     '<div class="card-row__subtitle">' + esc(p.description) + '</div>' +
@@ -902,9 +904,11 @@
                     break;
             }
 
+            var pkgIcon = window.LazyEnvIcons.getIcon(id || name, pkg ? pkg.category : "");
             html += '<div class="install-item' + cls + '" data-pkg-id="' + esc(id) + '">';
             html += '<div class="card-row">';
-            html += '<div class="card-row__icon">' + iconHtml + '</div>';
+            html += '<div class="card-row__icon">' + pkgIcon + '</div>';
+            html += '<div class="card-row__status">' + iconHtml + '</div>';
             html += '<div class="card-row__body">';
             html += '<div class="card-row__title">' + esc(name) + '</div>';
             html += '<div class="card-row__subtitle">' + esc(statusText) + '</div>';

@@ -278,7 +278,17 @@ a:hover { text-decoration: underline; }
     width: 36px; height: 36px; border-radius: var(--radius-sm);
     background: var(--accent-subtle); display: flex;
     align-items: center; justify-content: center;
-    flex-shrink: 0; margin-right: 16px; color: var(--accent);
+    flex-shrink: 0; margin-right: 12px; color: var(--accent);
+    overflow: hidden;
+}
+.card-row__icon svg {
+    width: 24px; height: 24px;
+}
+
+.card-row__status {
+    width: 20px; height: 20px; display: flex;
+    align-items: center; justify-content: center;
+    flex-shrink: 0; margin-right: 8px;
 }
 
 .card-row__body { flex: 1; min-width: 0; }
@@ -296,6 +306,38 @@ a:hover { text-decoration: underline; }
 .card-row__action { flex-shrink: 0; margin-left: 12px; display: flex; align-items: center; gap: 8px; }
 
 .card-row__chevron { color: var(--text-tertiary); flex-shrink: 0; margin-left: 8px; transition: transform 0.2s; }
+
+/* Selectable rows (Packages page) */
+.card-row--selectable {
+    cursor: pointer;
+    user-select: none;
+}
+.card-row--selectable:hover {
+    background: var(--bg-card-hover);
+}
+.card-row__check {
+    width: 20px; height: 20px;
+    border: 2px solid var(--text-tertiary);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-right: 12px;
+    transition: all 0.15s ease;
+    color: transparent;
+}
+.card-row__check svg {
+    width: 14px; height: 14px;
+}
+.card-row--selected .card-row__check {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+}
+.card-row--selected {
+    background: rgba(96, 205, 255, 0.06);
+}
+.card-row--selected:hover {
+    background: rgba(96, 205, 255, 0.1);
+}
 
 /* Expandable */
 .card-expander__header { cursor: pointer; }

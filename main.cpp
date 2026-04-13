@@ -924,6 +924,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         auto* mmi = reinterpret_cast<MINMAXINFO*>(lParam);
         mmi->ptMinTrackSize.x = 800;
         mmi->ptMinTrackSize.y = 600;
+
+        // Constrain maximized size to the work area (excludes taskbar)
+        HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (GetMonitorInfoW(mon, &mi)) {
+            mmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+            mmi->ptMaxPosition.y = mi.rcWork.top  - mi.rcMonitor.top;
+            mmi->ptMaxSize.x     = mi.rcWork.right  - mi.rcWork.left;
+            mmi->ptMaxSize.y     = mi.rcWork.bottom - mi.rcWork.top;
+        }
         return 0;
     }
 
