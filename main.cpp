@@ -704,6 +704,139 @@ std::string handleWebMessage(const std::string& message) {
                            jsonEscape(cmd), ok ? "true" : "false");
     }
 
+    // ------ List environment variables (for Settings page) ------
+    if (action == "listEnvVars") {
+        std::string scope = extractJsonValue(message, "scope");
+        bool sys = (scope == "system");
+
+        // Use captureRegistryKey indirectly via a temporary snapshot approach,
+        // or directly enumerate the registry. We'll enumerate directly.
+        HKEY root = sys ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER;
+        const wchar_t* subKey = sys
+            ? L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
+            : L"Environment";
+
+        HKEY hKey = nullptr;
+        LONG rc = RegOpenKeyExW(root, subKey, 0, KEY_READ, &hKey);
+
+        std::ostringstream os;
+        os << "{\"action\":\"envVarList\",\"variables\":[";
+        bool first = true;
+
+        if (rc == ERROR_SUCCESS) {
+            DWORD index = 0;
+            wchar_t nameBuf[1024];
+            BYTE valueBuf[32768];
+            DWORD nameLen, valueLen, type;
+
+            while (true) {
+                nameLen = 1024;
+                valueLen = 32768;
+                rc = RegEnumValueW(hKey, index, nameBuf, &nameLen,
+                                   nullptr, &type, valueBuf, &valueLen);
+                if (rc != ERROR_SUCCESS) break;
+
+                // Convert name to UTF-8
+                int nl = WideCharToMultiByte(CP_UTF8, 0, nameBuf, nameLen,
+                                            nullptr, 0, nullptr, nullptr);
+                std::string nameUtf8(nl, '\0');
+                WideCharToMultiByte(CP_UTF8, 0, nameBuf, nameLen,
+                                   nameUtf8.data(), nl, nullptr, nullptr);
+
+                // Convert value to UTF-8 (handle REG_SZ and REG_EXPAND_SZ)
+                std::string valueUtf8;
+                if (type == REG_SZ || type == REG_EXPAND_SZ) {
+                    int wchars = static_cast<int>(valueLen / sizeof(wchar_t));
+                    if (wchars > 0 && reinterpret_cast<wchar_t*>(valueBuf)[wchars - 1] == L'\0')
+                        wchars--;
+                    int vl = WideCharToMultiByte(CP_UTF8, 0,
+                                                reinterpret_cast<wchar_t*>(valueBuf), wchars,
+                                                nullptr, 0, nullptr, nullptr);
+                    valueUtf8.resize(vl);
+                    WideCharToMultiByte(CP_UTF8, 0,
+                                       reinterpret_cast<wchar_t*>(valueBuf), wchars,
+                                       valueUtf8.data(), vl, nullptr, nullptr);
+                } else if (type == REG_DWORD && valueLen >= 4) {
+                    DWORD dval = *reinterpret_cast<DWORD*>(valueBuf);
+                    valueUtf8 = std::to_string(dval);
+                } else {
+                    valueUtf8 = "(binary data)";
+                }
+
+                std::string typeStr;
+                switch (type) {
+                    case REG_SZ:        typeStr = "REG_SZ"; break;
+                    case REG_EXPAND_SZ: typeStr = "REG_EXPAND_SZ"; break;
+                    case REG_DWORD:     typeStr = "REG_DWORD"; break;
+                    default:            typeStr = "REG_BINARY"; break;
+                }
+
+                if (!first) os << ",";
+                first = false;
+                os << "{\"name\":\"" << jsonEscape(nameUtf8)
+                   << "\",\"value\":\"" << jsonEscape(valueUtf8)
+                   << "\",\"type\":\"" << typeStr << "\"}";
+
+                index++;
+            }
+            RegCloseKey(hKey);
+        }
+
+        os << "]}";
+        return os.str();
+    }
+
+    // ------ Write environment variable (for Settings page) ------
+    if (action == "writeEnvVar") {
+        std::string name  = extractJsonValue(message, "name");
+        std::string value = extractJsonValue(message, "value");
+        std::string typeStr = extractJsonValue(message, "type");
+        std::string scope = extractJsonValue(message, "scope");
+        bool sys = (scope == "system");
+
+        uint32_t regType = REG_SZ;
+        if (typeStr == "REG_EXPAND_SZ") regType = REG_EXPAND_SZ;
+
+        bool ok = lazyenv::RollbackManager::writeEnvVariable(name, value, regType, sys);
+        if (ok) lazyenv::RollbackManager::broadcastEnvironmentChange();
+
+        return std::format(
+            "{{\"action\":\"envVarWriteResult\",\"success\":{},\"name\":\"{}\"}}",
+            ok ? "true" : "false", jsonEscape(name));
+    }
+
+    // ------ Delete environment variable (for Settings page) ------
+    if (action == "deleteEnvVar") {
+        std::string name  = extractJsonValue(message, "name");
+        std::string scope = extractJsonValue(message, "scope");
+        bool sys = (scope == "system");
+
+        HKEY root = sys ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER;
+        const wchar_t* subKey = sys
+            ? L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
+            : L"Environment";
+
+        // Convert name to wide
+        int wl = MultiByteToWideChar(CP_UTF8, 0, name.c_str(), -1, nullptr, 0);
+        std::wstring wname(wl - 1, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, name.c_str(), -1, wname.data(), wl);
+
+        HKEY hKey = nullptr;
+        LONG rc = RegOpenKeyExW(root, subKey, 0, KEY_SET_VALUE, &hKey);
+        bool ok = false;
+        if (rc == ERROR_SUCCESS) {
+            rc = RegDeleteValueW(hKey, wname.c_str());
+            ok = (rc == ERROR_SUCCESS);
+            RegCloseKey(hKey);
+        }
+
+        if (ok) lazyenv::RollbackManager::broadcastEnvironmentChange();
+
+        return std::format(
+            "{{\"action\":\"envVarDeleteResult\",\"success\":{},\"name\":\"{}\"}}",
+            ok ? "true" : "false", jsonEscape(name));
+    }
+
     // ------ Read env var ------
     if (action == "readEnv") {
         std::string name = extractJsonValue(message, "name");

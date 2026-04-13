@@ -18,8 +18,8 @@
 
 // ============================================================================
 // LazyEnv - script.js
-// Frontend: sidebar navigation, home env detection, manual add, install
-// progress with streaming log, retry, window drag, i18n support
+// Frontend: sidebar navigation, home env detection, settings env-var editor,
+// install progress with streaming log, retry, window drag, i18n support
 // ============================================================================
 
 (function () {
@@ -36,14 +36,18 @@
     var currentPage = "home";
     var catalog = [];
     var selectedPackages = new Set();
-    var installResults = new Map();   // id -> {status, message, command, output, exitCode}
-    var installLogs = new Map();      // id -> [line, line, ...]
+    var installResults = new Map();
+    var installLogs = new Map();
     var preInstallSnapshotId = "";
     var detectedEnvironments = [];
-    var manualEnvironments = [];       // manually added envs
+    var manualEnvironments = [];
     var installTotal = 0;
     var installCurrent = 0;
     var isMaximized = false;
+
+    // Settings state
+    var envVarScope = "user";   // "user" or "system"
+    var envVarCache = [];       // [{name, value, type}]
 
     // -----------------------------------------------------------------------
     // Native bridge
@@ -90,20 +94,19 @@
 
             case "installStarted":
                 preInstallSnapshotId = d.snapshotId || "";
-                showSnapshotInfo();
                 break;
 
             case "installProgress":
                 installResults.set(d.packageId, {
                     status: d.status,
                     message: d.message || "",
-                    command: d.command || installResults.get(d.packageId)?.command || "",
+                    command: d.command || (installResults.has(d.packageId) ? installResults.get(d.packageId).command : ""),
                     output: d.output || "",
                     exitCode: d.exitCode
                 });
                 if (typeof d.current === "number") installCurrent = d.current;
                 if (typeof d.total === "number") installTotal = d.total;
-                renderProgress();
+                renderInstallList();
                 updateProgressBar();
                 break;
 
@@ -117,7 +120,8 @@
 
             case "installComplete":
                 preInstallSnapshotId = d.snapshotId || preInstallSnapshotId;
-                onInstallDone();
+                updateProgressBar();
+                renderInstallList();
                 break;
 
             case "snapshotCreated":
@@ -162,6 +166,30 @@
                     sendNative({ action: "detectEnvironments" });
                 } else {
                     showToast(t("env.uninstallFailed"), "error");
+                }
+                break;
+
+            // Settings: environment variable responses
+            case "envVarList":
+                envVarCache = d.variables || [];
+                renderEnvVarTable();
+                break;
+
+            case "envVarWriteResult":
+                if (d.success) {
+                    showToast(t("settings.saveSuccess"), "success");
+                    loadEnvVars();
+                } else {
+                    showToast(t("settings.saveFailed", d.message || ""), "error");
+                }
+                break;
+
+            case "envVarDeleteResult":
+                if (d.success) {
+                    showToast(t("settings.deleteSuccess"), "success");
+                    loadEnvVars();
+                } else {
+                    showToast(t("settings.deleteFailed", d.message || ""), "error");
                 }
                 break;
         }
@@ -258,6 +286,26 @@
         if (obj.action === "listSnapshots") {
             setTimeout(function () { handleNative({ action: "snapshotList", snapshots: [] }); }, 200);
         }
+        if (obj.action === "listEnvVars") {
+            setTimeout(function () {
+                handleNative({
+                    action: "envVarList",
+                    variables: [
+                        { name: "PATH", value: "C:\\Windows\\system32;C:\\Windows;C:\\Program Files\\Git\\cmd", type: "REG_EXPAND_SZ" },
+                        { name: "JAVA_HOME", value: "C:\\Program Files\\Java\\jdk-21", type: "REG_SZ" },
+                        { name: "GOPATH", value: "C:\\Users\\Rein\\go", type: "REG_SZ" },
+                        { name: "CARGO_HOME", value: "C:\\Users\\Rein\\.cargo", type: "REG_SZ" },
+                        { name: "TEMP", value: "%USERPROFILE%\\AppData\\Local\\Temp", type: "REG_EXPAND_SZ" },
+                    ]
+                });
+            }, 300);
+        }
+        if (obj.action === "writeEnvVar") {
+            setTimeout(function () { handleNative({ action: "envVarWriteResult", success: true }); }, 300);
+        }
+        if (obj.action === "deleteEnvVar") {
+            setTimeout(function () { handleNative({ action: "envVarDeleteResult", success: true }); }, 300);
+        }
         if (obj.action === "windowMinimize" || obj.action === "windowMaximize" || obj.action === "windowClose" || obj.action === "windowDragStart") {
             console.log("Window action:", obj.action);
         }
@@ -269,22 +317,38 @@
     function navigateTo(page) {
         currentPage = page;
         document.querySelectorAll(".page").forEach(function (p) {
-            p.classList.toggle("active", p.dataset.page === page);
+            p.classList.remove("page--active");
         });
+        var target = document.getElementById("page-" + page);
+        if (target) target.classList.add("page--active");
+
         document.querySelectorAll(".sidebar__item").forEach(function (item) {
-            item.classList.toggle("active", item.dataset.page === page);
+            item.classList.toggle("sidebar__item--active", item.dataset.page === page);
         });
 
         if (page === "home") sendNative({ action: "detectEnvironments" });
-        if (page === "check") initCheck();
+        if (page === "settings") loadEnvVars();
+        if (page === "syscheck") initCheck();
         if (page === "packages" && catalog.length === 0) sendNative({ action: "getCatalog" });
         if (page === "recovery") loadSnapshots();
         if (page === "summary") renderSummary();
     }
 
-    document.getElementById("sidebar").addEventListener("click", function (e) {
+    document.getElementById("sidebarNav").addEventListener("click", function (e) {
         var item = e.target.closest(".sidebar__item");
         if (item && item.dataset.page) navigateTo(item.dataset.page);
+    });
+
+    // Sidebar search - filter nav items
+    document.getElementById("sidebarSearch").addEventListener("input", function (e) {
+        var q = e.target.value.toLowerCase();
+        document.querySelectorAll(".sidebar__item").forEach(function (item) {
+            var text = item.textContent.toLowerCase();
+            item.style.display = (!q || text.includes(q)) ? "" : "none";
+        });
+        document.querySelectorAll(".sidebar__section-label").forEach(function (label) {
+            label.style.display = q ? "none" : "";
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -297,17 +361,17 @@
         window.LazyEnvI18n.setLocale(langSelect.value);
     });
 
-    // Re-render dynamic content when locale changes
     window.addEventListener("lazyenv:localeChanged", function () {
         t = window.LazyEnvI18n.t;
-        renderEnvironments(document.getElementById("envSearch").value);
-        if (currentPage === "check") renderChecks();
+        renderEnvironments(document.getElementById("homeSearch").value);
+        if (currentPage === "syscheck") renderChecks();
         if (catalog.length > 0) renderCatalog(document.getElementById("pkgSearch").value);
-        updatePkgUI();
+        updatePkgCount();
         if (installResults.size > 0) {
-            renderProgress();
+            renderInstallList();
             updateProgressBar();
         }
+        if (currentPage === "settings") renderEnvVarTable();
         if (currentPage === "recovery") loadSnapshots();
         if (currentPage === "summary") renderSummary();
     });
@@ -325,11 +389,11 @@
         sendNative({ action: "windowClose" });
     });
 
-    document.getElementById("titlebarDrag").addEventListener("dblclick", function () {
+    document.getElementById("dragRegion").addEventListener("dblclick", function () {
         sendNative({ action: "windowMaximize" });
     });
 
-    document.getElementById("titlebarDrag").addEventListener("mousedown", function (e) {
+    document.getElementById("dragRegion").addEventListener("mousedown", function (e) {
         if (e.button !== 0) return;
         if (e.target.closest("button") || e.target.closest("input") || e.target.closest("a")) return;
         sendNative({ action: "windowDragStart" });
@@ -366,12 +430,11 @@
     function getCategoryLabel(cat) {
         var key = "category." + cat;
         var result = t(key);
-        // If t() returns the key itself, it means no translation; use raw category
         return result === key ? cat : result;
     }
 
     function renderEnvironments(filter) {
-        var container = document.getElementById("envContainer");
+        var container = document.getElementById("envList");
         var envs = getAllEnvironments();
 
         if (filter) {
@@ -382,13 +445,12 @@
         }
 
         if (envs.length === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state__text">' +
+            container.innerHTML = '<div class="empty-state">' +
                 (detectedEnvironments.length === 0 && manualEnvironments.length === 0 ? t("env.scanning") : t("env.noMatch")) +
-                '</div></div>';
+                '</div>';
             return;
         }
 
-        // Group by category
         var groups = {};
         var order = ["language", "tool", "runtime", "utility", "editor", "database", "other"];
         envs.forEach(function (e) {
@@ -400,20 +462,20 @@
         var html = "";
         order.concat(Object.keys(groups).filter(function (k) { return order.indexOf(k) === -1; })).forEach(function (cat) {
             if (!groups[cat]) return;
-            html += '<div class="category-group"><div class="category-group__title">' + esc(getCategoryLabel(cat)) + ' (' + groups[cat].length + ')</div><div class="env-grid">';
+            html += '<div class="card-section"><div class="card-section__title">' + esc(getCategoryLabel(cat)) + ' (' + groups[cat].length + ')</div>';
             groups[cat].forEach(function (e) {
                 var initials = e.name.substring(0, 2).toUpperCase();
-                html += '<div class="env-card" data-cmd="' + esc(e.command) + '">' +
-                    '<div class="env-card__icon env-card__icon--' + esc(e.category) + '">' + initials + '</div>' +
-                    '<div class="env-card__info">' +
-                    '<div class="env-card__name">' + esc(e.name) + '</div>' +
-                    '<div class="env-card__version">' + esc(e.version) + '</div>' +
+                html += '<div class="card-row" data-cmd="' + esc(e.command) + '">' +
+                    '<div class="card-row__icon card-row__icon--' + esc(e.category) + '">' + initials + '</div>' +
+                    '<div class="card-row__body">' +
+                    '<div class="card-row__title">' + esc(e.name) + '</div>' +
+                    '<div class="card-row__subtitle">' + esc(e.version) + '</div>' +
                     '</div>' +
-                    '<div class="env-card__actions">' +
-                    '<button class="btn btn--ghost btn--xs btn-uninstall" title="' + esc(t("env.btnUninstall")) + '">' + esc(t("env.btnUninstall")) + '</button>' +
+                    '<div class="card-row__actions">' +
+                    '<button class="btn btn--sm btn-uninstall">' + esc(t("env.btnUninstall")) + '</button>' +
                     '</div></div>';
             });
-            html += '</div></div>';
+            html += '</div>';
         });
 
         container.innerHTML = html;
@@ -421,22 +483,26 @@
         container.querySelectorAll(".btn-uninstall").forEach(function (btn) {
             btn.addEventListener("click", function (ev) {
                 ev.stopPropagation();
-                var card = btn.closest(".env-card");
-                var name = card.querySelector(".env-card__name").textContent;
-                if (confirm(t("env.confirmUninstall", name))) {
-                    sendNative({ action: "uninstallPackage", command: name });
-                }
+                var row = btn.closest(".card-row");
+                var name = row.querySelector(".card-row__title").textContent;
+                showDialog(
+                    t("env.confirmUninstallTitle"),
+                    t("env.confirmUninstall", name),
+                    [
+                        { text: t("dialog.cancel"), cls: "" },
+                        { text: t("env.btnUninstall"), cls: "btn--danger", action: function () { sendNative({ action: "uninstallPackage", command: name }); } }
+                    ]
+                );
             });
         });
     }
 
-    document.getElementById("envSearch").addEventListener("input", function (e) {
+    document.getElementById("homeSearch").addEventListener("input", function (e) {
         renderEnvironments(e.target.value);
     });
 
     document.getElementById("btnRefreshEnv").addEventListener("click", function () {
-        document.getElementById("envContainer").innerHTML =
-            '<div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+        document.getElementById("envList").innerHTML = '<div class="empty-state">' + t("env.scanning") + '</div>';
         detectedEnvironments = [];
         sendNative({ action: "detectEnvironments" });
     });
@@ -447,52 +513,222 @@
     var addEnvPanel = document.getElementById("addEnvPanel");
 
     document.getElementById("btnAddEnv").addEventListener("click", function () {
-        addEnvPanel.style.display = addEnvPanel.style.display === "none" ? "block" : "none";
-        if (addEnvPanel.style.display === "block") {
-            document.getElementById("addEnvCommand").focus();
+        addEnvPanel.classList.toggle("add-panel--visible");
+        if (addEnvPanel.classList.contains("add-panel--visible")) {
+            document.getElementById("addEnvCmd").focus();
         }
     });
 
-    document.getElementById("btnCloseAddEnv").addEventListener("click", function () {
-        addEnvPanel.style.display = "none";
+    document.getElementById("btnCloseAddPanel").addEventListener("click", function () {
+        addEnvPanel.classList.remove("add-panel--visible");
     });
 
-    document.getElementById("btnProbeEnv").addEventListener("click", function () {
-        var cmd = document.getElementById("addEnvCommand").value.trim();
+    document.getElementById("btnDetectEnv").addEventListener("click", function () {
+        var cmd = document.getElementById("addEnvCmd").value.trim();
         if (!cmd) return;
         var cat = document.getElementById("addEnvCategory").value;
-        var status = document.getElementById("probeStatus");
-        status.textContent = t("probe.detecting");
-        status.className = "add-env-form__status loading";
         sendNative({ action: "probeCommand", command: cmd, category: cat });
     });
 
-    document.getElementById("addEnvCommand").addEventListener("keydown", function (e) {
+    document.getElementById("addEnvCmd").addEventListener("keydown", function (e) {
         if (e.key === "Enter") {
             e.preventDefault();
-            document.getElementById("btnProbeEnv").click();
+            document.getElementById("btnDetectEnv").click();
         }
     });
 
     function handleProbeResult(d) {
-        var status = document.getElementById("probeStatus");
         if (d.found) {
-            status.textContent = t("probe.found", d.version);
-            status.className = "add-env-form__status success";
-
             manualEnvironments.push({
                 name: d.name,
                 command: d.command,
                 version: d.version,
                 category: d.category || "other"
             });
-
-            document.getElementById("addEnvCommand").value = "";
-            renderEnvironments(document.getElementById("envSearch").value);
+            document.getElementById("addEnvCmd").value = "";
+            renderEnvironments(document.getElementById("homeSearch").value);
             showToast(t("probe.addedToast", d.name, d.version), "success");
         } else {
-            status.textContent = d.message || t("probe.notFound");
-            status.className = "add-env-form__status error";
+            showToast(d.message || t("probe.notFound"), "error");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Settings: Environment Variable Editor
+    // -----------------------------------------------------------------------
+    function loadEnvVars() {
+        sendNative({ action: "listEnvVars", scope: envVarScope });
+    }
+
+    // Tab switching
+    document.getElementById("envvarTabs").addEventListener("click", function (e) {
+        var tab = e.target.closest(".tab");
+        if (!tab || !tab.dataset.scope) return;
+        envVarScope = tab.dataset.scope;
+        document.querySelectorAll("#envvarTabs .tab").forEach(function (t) {
+            t.classList.toggle("tab--active", t.dataset.scope === envVarScope);
+        });
+        loadEnvVars();
+    });
+
+    function renderEnvVarTable() {
+        var tbody = document.getElementById("envvarBody");
+        var filter = document.getElementById("envvarSearch").value.toLowerCase();
+        var vars = envVarCache;
+
+        if (filter) {
+            vars = vars.filter(function (v) {
+                return v.name.toLowerCase().includes(filter) || v.value.toLowerCase().includes(filter);
+            });
+        }
+
+        if (vars.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">' +
+                (envVarCache.length === 0 ? t("settings.loading") : t("settings.noMatch")) +
+                '</td></tr>';
+            return;
+        }
+
+        var html = "";
+        vars.forEach(function (v) {
+            var isPath = v.name.toUpperCase() === "PATH" || v.name.toUpperCase() === "PATHEXT";
+            var displayVal = v.value;
+            if (isPath && displayVal.length > 80) {
+                displayVal = displayVal.substring(0, 80) + "...";
+            }
+            html += '<tr data-name="' + esc(v.name) + '">' +
+                '<td class="envvar-name">' + esc(v.name) +
+                (v.type === "REG_EXPAND_SZ" ? ' <span class="envvar-type">EXP</span>' : '') +
+                '</td>' +
+                '<td class="envvar-value">' + esc(displayVal) + '</td>' +
+                '<td class="envvar-actions">' +
+                '<button class="btn btn--sm btn-edit-var" title="' + esc(t("settings.edit")) + '">' +
+                '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5L13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175l-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>' +
+                '</button>' +
+                '<button class="btn btn--sm btn--danger btn-delete-var" title="' + esc(t("settings.delete")) + '">' +
+                '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5.5l1-1h3l1 1H13a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>' +
+                '</button>' +
+                '</td></tr>';
+        });
+
+        tbody.innerHTML = html;
+
+        // Bind edit buttons
+        tbody.querySelectorAll(".btn-edit-var").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var name = btn.closest("tr").dataset.name;
+                var v = envVarCache.find(function (x) { return x.name === name; });
+                if (v) showEnvVarEditDialog(v.name, v.value, v.type, false);
+            });
+        });
+
+        // Bind delete buttons
+        tbody.querySelectorAll(".btn-delete-var").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var name = btn.closest("tr").dataset.name;
+                showDialog(
+                    t("settings.confirmDeleteTitle"),
+                    t("settings.confirmDelete", name),
+                    [
+                        { text: t("dialog.cancel"), cls: "" },
+                        { text: t("settings.delete"), cls: "btn--danger", action: function () {
+                            sendNative({ action: "deleteEnvVar", name: name, scope: envVarScope });
+                        }}
+                    ]
+                );
+            });
+        });
+    }
+
+    document.getElementById("envvarSearch").addEventListener("input", function () {
+        renderEnvVarTable();
+    });
+
+    // New variable button
+    document.getElementById("btnAddEnvVar").addEventListener("click", function () {
+        showEnvVarEditDialog("", "", "REG_SZ", true);
+    });
+
+    function showEnvVarEditDialog(name, value, type, isNew) {
+        var isPathVar = name.toUpperCase() === "PATH";
+        var title = isNew ? t("settings.newVarTitle") : t("settings.editVarTitle", name);
+
+        var bodyHtml = '<div class="dialog-form">';
+        bodyHtml += '<div class="dialog-form__group">';
+        bodyHtml += '<label class="dialog-form__label">' + esc(t("settings.colName")) + '</label>';
+        bodyHtml += '<input type="text" class="input" id="dlgVarName" value="' + esc(name) + '"' + (isNew ? '' : ' readonly') + '>';
+        bodyHtml += '</div>';
+
+        bodyHtml += '<div class="dialog-form__group">';
+        bodyHtml += '<label class="dialog-form__label">' + esc(t("settings.colValue")) + '</label>';
+
+        if (isPathVar) {
+            // PATH editor: one entry per line
+            var pathEntries = value.split(";").filter(function (p) { return p.trim(); });
+            bodyHtml += '<div class="path-editor" id="dlgPathEditor">';
+            pathEntries.forEach(function (entry, idx) {
+                bodyHtml += '<div class="path-entry">' +
+                    '<input type="text" class="input input--mono path-input" value="' + esc(entry) + '">' +
+                    '<button class="btn--icon path-remove" data-idx="' + idx + '">' +
+                    '<svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.5"/></svg>' +
+                    '</button></div>';
+            });
+            bodyHtml += '</div>';
+            bodyHtml += '<button class="btn btn--sm mt-sm" id="dlgPathAdd">' + esc(t("settings.pathAdd")) + '</button>';
+        } else {
+            bodyHtml += '<textarea class="input input--mono dialog-form__textarea" id="dlgVarValue" rows="4">' + esc(value) + '</textarea>';
+        }
+        bodyHtml += '</div>';
+
+        bodyHtml += '<div class="dialog-form__group">';
+        bodyHtml += '<label class="dialog-form__label">' + esc(t("settings.type")) + '</label>';
+        bodyHtml += '<select class="input" id="dlgVarType">';
+        bodyHtml += '<option value="REG_SZ"' + (type === "REG_SZ" ? ' selected' : '') + '>REG_SZ</option>';
+        bodyHtml += '<option value="REG_EXPAND_SZ"' + (type === "REG_EXPAND_SZ" ? ' selected' : '') + '>REG_EXPAND_SZ</option>';
+        bodyHtml += '</select>';
+        bodyHtml += '</div>';
+        bodyHtml += '</div>';
+
+        showDialogRaw(title, bodyHtml, [
+            { text: t("dialog.cancel"), cls: "" },
+            { text: t("settings.save"), cls: "btn--accent", action: function () {
+                var newName = document.getElementById("dlgVarName").value.trim();
+                if (!newName) { showToast(t("settings.nameRequired"), "error"); return false; }
+                var newValue;
+                if (isPathVar || (newName.toUpperCase() === "PATH")) {
+                    var inputs = document.querySelectorAll("#dlgPathEditor .path-input");
+                    var parts = [];
+                    inputs.forEach(function (inp) { if (inp.value.trim()) parts.push(inp.value.trim()); });
+                    newValue = parts.join(";");
+                } else {
+                    newValue = document.getElementById("dlgVarValue").value;
+                }
+                var newType = document.getElementById("dlgVarType").value;
+                sendNative({
+                    action: "writeEnvVar",
+                    name: newName,
+                    value: newValue,
+                    type: newType,
+                    scope: envVarScope
+                });
+            }}
+        ]);
+
+        // PATH editor: add/remove entries
+        if (isPathVar) {
+            var editor = document.getElementById("dlgPathEditor");
+            document.getElementById("dlgPathAdd").addEventListener("click", function () {
+                var div = document.createElement("div");
+                div.className = "path-entry";
+                div.innerHTML = '<input type="text" class="input input--mono path-input" value="">' +
+                    '<button class="btn--icon path-remove"><svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.5"/></svg></button>';
+                editor.appendChild(div);
+                div.querySelector("input").focus();
+                div.querySelector(".path-remove").addEventListener("click", function () { div.remove(); });
+            });
+            editor.querySelectorAll(".path-remove").forEach(function (btn) {
+                btn.addEventListener("click", function () { btn.closest(".path-entry").remove(); });
+            });
         }
     }
 
@@ -519,20 +755,28 @@
             { label: t("check.winget"), value: checkStates.winget === null ? t("check.checking") : (checkStates.winget ? t("check.available") : t("check.notFound")), ok: checkStates.winget === null ? null : (checkStates.winget ? "ok" : "fail") }
         ];
 
-        document.getElementById("checkList").innerHTML = items.map(function (c) {
+        var container = document.getElementById("checkResults");
+        container.innerHTML = items.map(function (c) {
             var icon = "";
-            if (c.ok === "ok") icon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--success)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
-            else if (c.ok === "fail") icon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--error)"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>';
-            else icon = '<div class="spinner" style="width:16px;height:16px;border-width:1.5px;"></div>';
-            return '<div class="check-item"><div class="check-item__icon">' + icon + '</div><div class="check-item__label">' + esc(c.label) + '</div><div class="check-item__value">' + esc(c.value) + '</div></div>';
+            if (c.ok === "ok") icon = '<svg width="18" height="18" viewBox="0 0 16 16" fill="var(--success)"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>';
+            else if (c.ok === "fail") icon = '<svg width="18" height="18" viewBox="0 0 16 16" fill="var(--error)"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/></svg>';
+            else icon = '<div class="spinner-sm"></div>';
+            return '<div class="card-row"><div class="card-row__icon">' + icon + '</div>' +
+                '<div class="card-row__body"><div class="card-row__title">' + esc(c.label) + '</div>' +
+                '<div class="card-row__subtitle">' + esc(c.value) + '</div></div></div>';
         }).join("");
     }
+
+    document.getElementById("btnRunChecks").addEventListener("click", function () {
+        checkStates = { os: null, webview2: true, winget: null };
+        initCheck();
+    });
 
     // -----------------------------------------------------------------------
     // Packages
     // -----------------------------------------------------------------------
     function renderCatalog(filter) {
-        var container = document.getElementById("catalogContainer");
+        var container = document.getElementById("packageList");
         var pkgs = catalog;
 
         if (filter) {
@@ -553,46 +797,53 @@
         var html = "";
         order.concat(Object.keys(groups).filter(function (k) { return order.indexOf(k) === -1; })).forEach(function (cat) {
             if (!groups[cat]) return;
-            html += '<div class="category-group"><div class="category-group__title">' + esc(getCategoryLabel(cat)) + '</div><div class="pkg-grid">';
+            html += '<div class="card-section"><div class="card-section__title">' + esc(getCategoryLabel(cat)) + '</div>';
             groups[cat].forEach(function (p) {
-                var sel = selectedPackages.has(p.id) ? " selected" : "";
-                html += '<div class="pkg-card' + sel + '" data-id="' + esc(p.id) + '">' +
-                    '<div class="pkg-card__check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>' +
-                    '<div><div class="pkg-card__name">' + esc(p.name) + '</div>' +
-                    '<div class="pkg-card__desc">' + esc(p.description) + '</div></div></div>';
+                var sel = selectedPackages.has(p.id);
+                html += '<div class="card-row card-row--selectable' + (sel ? ' card-row--selected' : '') + '" data-id="' + esc(p.id) + '">' +
+                    '<div class="card-row__check">' +
+                    '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' +
+                    '</div>' +
+                    '<div class="card-row__body">' +
+                    '<div class="card-row__title">' + esc(p.name) + '</div>' +
+                    '<div class="card-row__subtitle">' + esc(p.description) + '</div>' +
+                    '</div></div>';
             });
-            html += '</div></div>';
+            html += '</div>';
         });
 
         container.innerHTML = html;
 
-        container.querySelectorAll(".pkg-card").forEach(function (card) {
-            card.addEventListener("click", function () {
-                var id = card.dataset.id;
-                if (selectedPackages.has(id)) { selectedPackages.delete(id); card.classList.remove("selected"); }
-                else { selectedPackages.add(id); card.classList.add("selected"); }
-                updatePkgUI();
+        container.querySelectorAll(".card-row--selectable").forEach(function (row) {
+            row.addEventListener("click", function () {
+                var id = row.dataset.id;
+                if (selectedPackages.has(id)) { selectedPackages.delete(id); row.classList.remove("card-row--selected"); }
+                else { selectedPackages.add(id); row.classList.add("card-row--selected"); }
+                updatePkgCount();
             });
         });
     }
 
-    function updatePkgUI() {
+    function updatePkgCount() {
         var n = selectedPackages.size;
-        var btn = document.getElementById("btnStartInstall");
-        btn.disabled = n === 0;
-        var span = btn.querySelector("span[data-i18n]");
-        if (span) {
-            span.textContent = t("packages.btnInstall", n);
-        } else {
-            btn.textContent = t("packages.btnInstall", n);
-        }
-        var badge = document.getElementById("pkgBadge");
-        if (n > 0) { badge.style.display = ""; badge.textContent = n; }
-        else { badge.style.display = "none"; }
+        document.getElementById("pkgSelectedCount").textContent = t("packages.selectedCount", n);
+        document.getElementById("btnStartInstall").disabled = n === 0;
     }
 
     document.getElementById("pkgSearch").addEventListener("input", function (e) {
         renderCatalog(e.target.value);
+    });
+
+    document.getElementById("btnSelectAll").addEventListener("click", function () {
+        catalog.forEach(function (p) { selectedPackages.add(p.id); });
+        renderCatalog(document.getElementById("pkgSearch").value);
+        updatePkgCount();
+    });
+
+    document.getElementById("btnDeselectAll").addEventListener("click", function () {
+        selectedPackages.clear();
+        renderCatalog(document.getElementById("pkgSearch").value);
+        updatePkgCount();
     });
 
     document.getElementById("btnStartInstall").addEventListener("click", function () {
@@ -613,14 +864,13 @@
             installResults.set(id, { status: "pending", message: t("install.waiting"), command: "", output: "" });
             installLogs.set(id, []);
         });
-        renderProgress();
+        renderInstallList();
         updateProgressBar();
-        document.getElementById("installProgressWrap").style.display = "block";
         sendNative({ action: "install", packages: Array.from(selectedPackages) });
     }
 
-    function renderProgress() {
-        var list = document.getElementById("progressList");
+    function renderInstallList() {
+        var list = document.getElementById("installList");
         var html = "";
 
         installResults.forEach(function (r, id) {
@@ -632,81 +882,76 @@
 
             switch (r.status) {
                 case "pending":
-                    iconHtml = '<div style="width:16px;height:16px;border-radius:50%;background:var(--bg-tertiary);"></div>';
+                    iconHtml = '<div class="status-dot status-dot--pending"></div>';
                     statusText = t("install.pending");
                     break;
                 case "running":
-                    iconHtml = '<div class="spinner"></div>';
-                    cls = " running";
+                    iconHtml = '<div class="spinner-sm"></div>';
+                    cls = " card-row--running";
                     statusText = t("install.installing");
                     break;
                 case "success":
-                    iconHtml = '<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--success)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
-                    cls = " success";
+                    iconHtml = '<svg width="16" height="16" viewBox="0 0 16 16" fill="var(--success)"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>';
+                    cls = " card-row--success";
                     statusText = t("install.installed");
                     break;
                 case "failed":
-                    iconHtml = '<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--error)"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>';
-                    cls = " failed";
+                    iconHtml = '<svg width="16" height="16" viewBox="0 0 16 16" fill="var(--error)"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293 5.354 4.646z"/></svg>';
+                    cls = " card-row--failed";
                     statusText = t("install.failed", r.exitCode);
-                    break;
-                case "skipped":
-                    iconHtml = '<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--warning)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
-                    cls = " skipped";
-                    statusText = t("install.skipped");
                     break;
             }
 
-            html += '<div class="progress-item' + cls + '" data-pkg-id="' + esc(id) + '">';
-            html += '<div class="progress-item__header">';
-            html += '<div class="progress-item__icon">' + iconHtml + '</div>';
-            html += '<div class="progress-item__name">' + esc(name) + '</div>';
-            html += '<div class="progress-item__status">' + esc(statusText) + '</div>';
-
+            html += '<div class="install-item' + cls + '" data-pkg-id="' + esc(id) + '">';
+            html += '<div class="card-row">';
+            html += '<div class="card-row__icon">' + iconHtml + '</div>';
+            html += '<div class="card-row__body">';
+            html += '<div class="card-row__title">' + esc(name) + '</div>';
+            html += '<div class="card-row__subtitle">' + esc(statusText) + '</div>';
+            html += '</div>';
             if (r.status === "failed") {
-                html += '<div class="progress-item__actions">';
-                html += '<button class="btn btn--primary btn--xs btn-retry" data-id="' + esc(id) + '">' + esc(t("install.btnRetry")) + '</button>';
-                html += '</div>';
+                html += '<div class="card-row__actions"><button class="btn btn--sm btn--accent btn-retry" data-id="' + esc(id) + '">' + esc(t("install.btnRetry")) + '</button></div>';
             }
             html += '</div>';
 
-            html += '<div class="progress-item__detail">';
+            // Command + log
             if (r.command) {
-                html += '<div class="progress-item__cmd">' + esc(r.command) + '</div>';
+                html += '<div class="install-item__cmd">' + esc(r.command) + '</div>';
             }
 
             var logLines = installLogs.get(id) || [];
             if (logLines.length > 0 || r.status === "running") {
-                html += '<div class="progress-item__log" id="log-' + esc(id) + '">';
+                html += '<div class="install-item__log" id="log-' + esc(id) + '">';
                 logLines.forEach(function (line) {
-                    html += '<span class="log-line">' + esc(line) + '</span>';
+                    html += '<div class="log-line">' + esc(line) + '</div>';
                 });
                 if (r.status === "running" && logLines.length === 0) {
-                    html += '<span class="log-line" style="color:var(--text-tertiary);">' + esc(t("install.waitingOutput")) + '</span>';
+                    html += '<div class="log-line log-line--dim">' + esc(t("install.waitingOutput")) + '</div>';
                 }
                 html += '</div>';
             }
 
             if (r.status === "failed" && r.output) {
-                html += '<div class="progress-item__output">' + esc(r.output) + '</div>';
+                html += '<div class="install-item__error">' + esc(r.output) + '</div>';
             }
-            html += '</div>';
 
             html += '</div>';
         });
 
-        list.innerHTML = html || '<div class="empty-state"><div class="empty-state__text">' + esc(t("install.noPackages")) + '</div></div>';
+        list.innerHTML = html || '<div class="empty-state">' + esc(t("install.noPackages")) + '</div>';
 
+        // Retry buttons
         list.querySelectorAll(".btn-retry").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 var pkgId = btn.dataset.id;
                 installResults.set(pkgId, { status: "pending", message: t("install.retrying"), command: "", output: "" });
                 installLogs.set(pkgId, []);
-                renderProgress();
+                renderInstallList();
                 sendNative({ action: "retryInstall", packageId: pkgId });
             });
         });
 
+        // Auto-scroll logs
         installResults.forEach(function (r, id) {
             if (r.status === "running") {
                 var logEl = document.getElementById("log-" + id);
@@ -717,23 +962,20 @@
 
     function updateLogPanel(packageId) {
         var logEl = document.getElementById("log-" + packageId);
-        if (!logEl) {
-            renderProgress();
-            return;
-        }
+        if (!logEl) { renderInstallList(); return; }
         var lines = installLogs.get(packageId) || [];
         var html = "";
         lines.forEach(function (line) {
-            html += '<span class="log-line">' + esc(line) + '</span>';
+            html += '<div class="log-line">' + esc(line) + '</div>';
         });
         logEl.innerHTML = html;
         logEl.scrollTop = logEl.scrollHeight;
     }
 
     function updateProgressBar() {
-        var bar = document.getElementById("installBar");
-        var text = document.getElementById("installProgressText");
-        var pct = document.getElementById("installProgressPct");
+        var fill = document.getElementById("installProgressFill");
+        var text = document.getElementById("installProgress");
+        var pct = document.getElementById("installPercent");
 
         var done = 0;
         var failed = 0;
@@ -745,23 +987,12 @@
         var total = installResults.size || 1;
         var percent = Math.round((done / total) * 100);
 
-        bar.style.width = percent + "%";
-        bar.classList.toggle("error", failed > 0 && done === total);
+        fill.style.width = percent + "%";
+        if (failed > 0 && done === total) fill.classList.add("progress-bar__fill--error");
+        else fill.classList.remove("progress-bar__fill--error");
+
         text.textContent = t("install.progressText", done, total);
         pct.textContent = percent + "%";
-    }
-
-    function showSnapshotInfo() {
-        var el = document.getElementById("installSnapshotInfo");
-        if (preInstallSnapshotId) {
-            el.style.display = "block";
-            el.textContent = t("recovery.snapshotCreated", preInstallSnapshotId);
-        }
-    }
-
-    function onInstallDone() {
-        updateProgressBar();
-        renderProgress();
     }
 
     // -----------------------------------------------------------------------
@@ -774,92 +1005,166 @@
     function renderSnapshots(snaps) {
         var list = document.getElementById("snapshotList");
         if (snaps.length === 0) {
-            list.innerHTML = '<div class="empty-state"><div class="empty-state__text">' + esc(t("recovery.emptyState")) + '</div></div>';
+            list.innerHTML = '<div class="empty-state">' + esc(t("recovery.emptyState")) + '</div>';
             return;
         }
 
-        list.innerHTML = snaps.map(function (s) {
-            return '<div class="snapshot-card" data-id="' + esc(s.id) + '">' +
-                '<div class="snapshot-card__info">' +
-                '<div class="snapshot-card__desc">' + esc(s.description) + '</div>' +
-                '<div class="snapshot-card__meta">' + esc(s.id) + ' | ' + esc(s.timestamp) +
-                ' | ' + t("recovery.userCount", s.userVarCount || 0) + ' | ' + t("recovery.systemCount", s.systemVarCount || 0) + '</div>' +
-                '</div><div class="snapshot-card__actions">' +
-                '<button class="btn btn--primary btn--xs btn-restore">' + esc(t("recovery.btnRestore")) + '</button>' +
-                '<button class="btn btn--secondary btn--xs btn-export">' + esc(t("recovery.btnExport")) + '</button>' +
-                '<button class="btn btn--danger btn--xs btn-delete">' + esc(t("recovery.btnDelete")) + '</button>' +
+        var html = "";
+        snaps.forEach(function (s) {
+            html += '<div class="card-row" data-id="' + esc(s.id) + '">' +
+                '<div class="card-row__icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="var(--accent)"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg></div>' +
+                '<div class="card-row__body">' +
+                '<div class="card-row__title">' + esc(s.description) + '</div>' +
+                '<div class="card-row__subtitle">' + esc(s.timestamp) + ' | ' + t("recovery.userCount", s.userVarCount || 0) + ' | ' + t("recovery.systemCount", s.systemVarCount || 0) + '</div>' +
+                '</div>' +
+                '<div class="card-row__actions">' +
+                '<button class="btn btn--sm btn-restore">' + esc(t("recovery.btnRestore")) + '</button>' +
+                '<button class="btn btn--sm btn-export">' + esc(t("recovery.btnExport")) + '</button>' +
+                '<button class="btn btn--sm btn--danger btn-delete">' + esc(t("recovery.btnDelete")) + '</button>' +
                 '</div></div>';
-        }).join("");
+        });
 
-        list.querySelectorAll(".snapshot-card").forEach(function (card) {
-            var id = card.dataset.id;
-            card.querySelector(".btn-restore").addEventListener("click", function (e) {
+        list.innerHTML = html;
+
+        list.querySelectorAll(".card-row").forEach(function (row) {
+            var id = row.dataset.id;
+            if (!id) return;
+            row.querySelector(".btn-restore").addEventListener("click", function (e) {
                 e.stopPropagation();
-                if (confirm(t("recovery.confirmRestore"))) {
-                    sendNative({ action: "restoreSnapshot", snapshotId: id });
-                }
+                showDialog(
+                    t("recovery.confirmRestoreTitle"),
+                    t("recovery.confirmRestore"),
+                    [
+                        { text: t("dialog.cancel"), cls: "" },
+                        { text: t("recovery.btnRestore"), cls: "btn--accent", action: function () { sendNative({ action: "restoreSnapshot", snapshotId: id }); } }
+                    ]
+                );
             });
-            card.querySelector(".btn-export").addEventListener("click", function (e) {
+            row.querySelector(".btn-export").addEventListener("click", function (e) {
                 e.stopPropagation();
                 sendNative({ action: "exportSnapshot", snapshotId: id });
             });
-            card.querySelector(".btn-delete").addEventListener("click", function (e) {
+            row.querySelector(".btn-delete").addEventListener("click", function (e) {
                 e.stopPropagation();
-                if (confirm(t("recovery.confirmDelete"))) {
-                    sendNative({ action: "deleteSnapshot", snapshotId: id });
-                }
+                showDialog(
+                    t("recovery.confirmDeleteTitle"),
+                    t("recovery.confirmDelete"),
+                    [
+                        { text: t("dialog.cancel"), cls: "" },
+                        { text: t("recovery.btnDelete"), cls: "btn--danger", action: function () { sendNative({ action: "deleteSnapshot", snapshotId: id }); } }
+                    ]
+                );
             });
         });
     }
 
     document.getElementById("btnCreateSnapshot").addEventListener("click", function () {
-        var desc = prompt(t("recovery.promptDesc"));
-        sendNative({ action: "createSnapshot", description: desc || t("recovery.defaultDesc") });
+        showDialogRaw(
+            t("recovery.createTitle"),
+            '<div class="dialog-form"><div class="dialog-form__group">' +
+            '<label class="dialog-form__label">' + esc(t("recovery.descLabel")) + '</label>' +
+            '<input type="text" class="input" id="dlgSnapDesc" value="">' +
+            '</div></div>',
+            [
+                { text: t("dialog.cancel"), cls: "" },
+                { text: t("recovery.create"), cls: "btn--accent", action: function () {
+                    var desc = document.getElementById("dlgSnapDesc").value.trim() || t("recovery.defaultDesc");
+                    sendNative({ action: "createSnapshot", description: desc });
+                }}
+            ]
+        );
+        setTimeout(function () { var el = document.getElementById("dlgSnapDesc"); if (el) el.focus(); }, 100);
     });
 
     document.getElementById("btnImportSnapshot").addEventListener("click", function () {
         sendNative({ action: "importSnapshot" });
     });
 
-    document.getElementById("btnRefreshSnapshots").addEventListener("click", function () {
-        loadSnapshots();
-    });
-
     // -----------------------------------------------------------------------
     // Summary
     // -----------------------------------------------------------------------
     function renderSummary() {
-        var tbody = document.getElementById("summaryBody");
-        var html = "";
+        var container = document.getElementById("summaryContent");
+        if (installResults.size === 0) {
+            container.innerHTML = '<div class="empty-state">' + esc(t("summary.emptyState")) + '</div>';
+            return;
+        }
+
+        var html = '<table class="data-table"><thead><tr>' +
+            '<th>' + esc(t("summary.colName")) + '</th>' +
+            '<th>' + esc(t("summary.colStatus")) + '</th>' +
+            '<th>' + esc(t("summary.colCommand")) + '</th>' +
+            '<th>' + esc(t("summary.colMessage")) + '</th>' +
+            '</tr></thead><tbody>';
+
         installResults.forEach(function (r, id) {
             var pkg = catalog.find(function (p) { return p.id === id; });
             var name = pkg ? pkg.name : id;
             var badgeCls = "";
             var badgeText = "";
             switch (r.status) {
-                case "success": badgeCls = "badge-status--success"; badgeText = t("summary.success"); break;
-                case "failed":  badgeCls = "badge-status--error";   badgeText = t("summary.failed");  break;
-                case "skipped": badgeCls = "badge-status--skipped"; badgeText = t("summary.skipped"); break;
-                default:        badgeCls = "badge-status--running"; badgeText = r.status;  break;
+                case "success": badgeCls = "badge--success"; badgeText = t("summary.success"); break;
+                case "failed":  badgeCls = "badge--error";   badgeText = t("summary.failed");  break;
+                case "skipped": badgeCls = "badge--warning"; badgeText = t("summary.skipped"); break;
+                default:        badgeCls = "";               badgeText = r.status;  break;
             }
             html += '<tr><td>' + esc(name) + '</td>' +
-                '<td><span class="badge-status ' + badgeCls + '">' + badgeText + '</span></td>' +
-                '<td style="font-family:var(--font-mono);font-size:11px;color:var(--text-tertiary);max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.command || "-") + '</td>' +
-                '<td style="font-size:11px;color:var(--text-tertiary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.output || r.message || "-") + '</td></tr>';
+                '<td><span class="badge ' + badgeCls + '">' + badgeText + '</span></td>' +
+                '<td class="text-mono text-sm">' + esc(r.command || "-") + '</td>' +
+                '<td class="text-sm">' + esc(r.output || r.message || "-") + '</td></tr>';
         });
-        tbody.innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary);">' + esc(t("summary.emptyState")) + '</td></tr>';
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
     }
+
+    // -----------------------------------------------------------------------
+    // Dialog
+    // -----------------------------------------------------------------------
+    function showDialog(title, message, buttons) {
+        showDialogRaw(title, '<p>' + esc(message) + '</p>', buttons);
+    }
+
+    function showDialogRaw(title, bodyHtml, buttons) {
+        var overlay = document.getElementById("dialogOverlay");
+        document.getElementById("dialogTitle").textContent = title;
+        document.getElementById("dialogBody").innerHTML = bodyHtml;
+
+        var footer = document.getElementById("dialogFooter");
+        footer.innerHTML = "";
+        buttons.forEach(function (b) {
+            var btn = document.createElement("button");
+            btn.className = "btn " + (b.cls || "");
+            btn.textContent = b.text;
+            btn.addEventListener("click", function () {
+                if (b.action) {
+                    var result = b.action();
+                    if (result === false) return; // prevent close
+                }
+                overlay.classList.remove("dialog-overlay--visible");
+            });
+            footer.appendChild(btn);
+        });
+
+        overlay.classList.add("dialog-overlay--visible");
+    }
+
+    document.getElementById("dialogOverlay").addEventListener("click", function (e) {
+        if (e.target === this) this.classList.remove("dialog-overlay--visible");
+    });
 
     // -----------------------------------------------------------------------
     // Toast notification
     // -----------------------------------------------------------------------
     function showToast(msg, type) {
+        var container = document.getElementById("toastContainer");
         var el = document.createElement("div");
         el.className = "toast" + (type ? " toast--" + type : "");
         el.textContent = msg;
-        document.body.appendChild(el);
-        setTimeout(function () { el.style.opacity = "0"; el.style.transition = "opacity 300ms"; }, 2500);
-        setTimeout(function () { el.remove(); }, 3000);
+        container.appendChild(el);
+        requestAnimationFrame(function () { el.classList.add("toast--visible"); });
+        setTimeout(function () { el.classList.remove("toast--visible"); }, 3000);
+        setTimeout(function () { el.remove(); }, 3500);
     }
 
     // -----------------------------------------------------------------------

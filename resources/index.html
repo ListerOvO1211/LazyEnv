@@ -7,16 +7,7 @@
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program. If not, see <https://www.gnu.org/licenses/>.
 -->
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -25,256 +16,283 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="app">
 
-    <!-- Custom Title Bar (borderless window) -->
-    <div class="titlebar" id="titlebar">
-        <div class="titlebar__drag" id="titlebarDrag">
-            <div class="titlebar__brand">
-                <svg class="titlebar__icon" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+<!-- Titlebar -->
+<div class="titlebar">
+    <div class="titlebar__drag" id="dragRegion">
+        <span class="titlebar__label">LazyEnv</span>
+    </div>
+    <div class="titlebar__controls">
+        <button class="titlebar__btn" id="btnMin" title="Minimize">
+            <svg viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="titlebar__btn" id="btnMax" title="Maximize">
+            <svg viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" fill="none" stroke-width="1"/></svg>
+        </button>
+        <button class="titlebar__btn titlebar__btn--close" id="btnClose" title="Close">
+            <svg viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+        </button>
+    </div>
+</div>
+
+<!-- App -->
+<div class="app">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar__header">
+            <div class="sidebar__search-wrap">
+                <svg class="sidebar__search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/>
                 </svg>
-                <span class="titlebar__label" data-i18n="titlebar.label">LazyEnv</span>
+                <input type="text" class="sidebar__search" id="sidebarSearch" data-i18n-placeholder="sidebar.search">
             </div>
         </div>
-        <div class="titlebar__controls">
-            <button class="titlebar__btn" id="btnMin" data-i18n-title="btn.minimize" title="Minimize">
-                <svg viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
-            </button>
-            <button class="titlebar__btn" id="btnMax" data-i18n-title="btn.maximize" title="Maximize">
-                <svg viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" stroke-width="1" fill="none"/></svg>
-            </button>
-            <button class="titlebar__btn titlebar__btn--close" id="btnClose" data-i18n-title="btn.close" title="Close">
-                <svg viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
-            </button>
-        </div>
-    </div>
 
-    <div class="layout">
+        <div class="sidebar__nav" id="sidebarNav">
+            <div class="sidebar__section-label" data-i18n="sidebar.overview">Overview</div>
 
-        <!-- Sidebar -->
-        <nav class="sidebar" id="sidebar">
-            <div class="sidebar__section" data-i18n="sidebar.overview">Overview</div>
-            <div class="sidebar__item active" data-page="home">
-                <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            <div class="sidebar__item sidebar__item--active" data-page="home">
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>
                 <span data-i18n="sidebar.home">Home</span>
             </div>
 
-            <div class="sidebar__section" data-i18n="sidebar.setup">Setup</div>
-            <div class="sidebar__item" data-page="check">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                <span data-i18n="sidebar.systemCheck">System Check</span>
+            <div class="sidebar__item" data-page="settings">
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.421 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.421-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
+                <span data-i18n="sidebar.settings">Settings</span>
             </div>
+
+            <div class="sidebar__section-label" data-i18n="sidebar.setup">Setup</div>
+
+            <div class="sidebar__item" data-page="syscheck">
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h13zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13z"/><path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zM3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8zm0 2.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5z"/></svg>
+                <span data-i18n="sidebar.syscheck">System Check</span>
+            </div>
+
             <div class="sidebar__item" data-page="packages">
-                <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H6v-2h8v2zm4-4H6v-2h12v2z"/></svg>
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8.186 1.113a.5.5 0 0 0-.372 0L1.846 3.5 8 5.961 14.154 3.5 8.186 1.113zM15 4.239l-6.5 2.6v7.922l6.5-2.6V4.24zM7.5 14.762V6.838L1 4.239v7.923l6.5 2.6zM7.443.184a1.5 1.5 0 0 1 1.114 0l7.129 2.852A.5.5 0 0 1 16 3.5v8.662a1 1 0 0 1-.629.928l-7.185 2.874a.5.5 0 0 1-.372 0L.63 13.09a1 1 0 0 1-.63-.928V3.5a.5.5 0 0 1 .314-.464L7.443.184z"/></svg>
                 <span data-i18n="sidebar.packages">Packages</span>
-                <span class="badge" id="pkgBadge" style="display:none;">0</span>
             </div>
+
             <div class="sidebar__item" data-page="install">
-                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
                 <span data-i18n="sidebar.install">Install</span>
             </div>
 
-            <div class="sidebar__section" data-i18n="sidebar.manage">Manage</div>
+            <div class="sidebar__section-label" data-i18n="sidebar.maintenance">Maintenance</div>
+
             <div class="sidebar__item" data-page="recovery">
-                <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
                 <span data-i18n="sidebar.recovery">Recovery</span>
             </div>
+
             <div class="sidebar__item" data-page="summary">
-                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                <svg class="sidebar__item-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm15 0a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2z"/><path d="M3 4h10v1H3V4zm0 3h7v1H3V7zm0 3h10v1H3v-1z"/></svg>
                 <span data-i18n="sidebar.summary">Summary</span>
             </div>
+        </div>
 
-            <!-- Language Switcher -->
-            <div class="sidebar__lang">
-                <label class="sidebar__lang-label" data-i18n="lang.label">Language</label>
-                <select class="sidebar__lang-select" id="langSelect">
-                    <option value="en">English</option>
-                    <option value="zh-CN">简体中文</option>
-                </select>
-            </div>
+        <div class="sidebar__footer">
+            <span class="sidebar__version">LazyEnv v0.1.0</span>
+            <select class="sidebar__lang-select" id="langSelect">
+                <option value="en">English</option>
+                <option value="zh-CN">中文</option>
+            </select>
+        </div>
+    </nav>
 
-            <div class="sidebar__footer">
-                LazyEnv v0.1.0
-            </div>
-        </nav>
+    <!-- Content -->
+    <main class="content">
+        <div class="content__inner">
 
-        <!-- Main Content -->
-        <div class="main" id="mainContent">
+            <!-- ==================== HOME ==================== -->
+            <div class="page page--active" id="page-home">
+                <h1 class="page-title" data-i18n="home.title">Home</h1>
+                <p class="page-desc" data-i18n="home.desc">Detected development environments on this machine.</p>
 
-            <!-- Home Page -->
-            <div class="page active" id="page-home" data-page="home">
-                <div class="page-header">
-                    <h1 class="page-header__title" data-i18n="home.title">Installed Environments</h1>
-                    <p class="page-header__desc" data-i18n="home.desc">
-                        Detected development tools and runtimes on this system.
-                    </p>
-                </div>
                 <div class="toolbar">
-                    <input type="text" class="toolbar__search" id="envSearch" data-i18n-placeholder="home.searchPlaceholder" placeholder="Search environments...">
-                    <button class="btn btn--primary btn--sm" id="btnAddEnv">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                        <span data-i18n="home.btnAdd">Add</span>
+                    <button class="btn" id="btnRefreshEnv">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                        <span data-i18n="home.refresh">Refresh</span>
                     </button>
-                    <button class="btn btn--secondary btn--sm" id="btnRefreshEnv">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                        <span data-i18n="home.btnRefresh">Refresh</span>
+                    <button class="btn" id="btnAddEnv">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+                        <span data-i18n="home.addManual">Add</span>
                     </button>
+                    <div class="toolbar__spacer"></div>
+                    <div class="toolbar__search-wrap">
+                        <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                        <input type="text" class="toolbar__search" id="homeSearch" data-i18n-placeholder="home.searchPlaceholder">
+                    </div>
                 </div>
 
-                <!-- Manual Add Environment Panel (hidden by default) -->
-                <div class="add-env-panel" id="addEnvPanel" style="display:none;">
-                    <div class="add-env-panel__header">
-                        <h3 data-i18n="home.addPanel.title">Add Development Environment</h3>
-                        <button class="add-env-panel__close" id="btnCloseAddEnv">&times;</button>
+                <!-- Manual Add Panel -->
+                <div class="add-panel" id="addEnvPanel">
+                    <div class="flex-between mb-md">
+                        <span class="form-label" data-i18n="home.addTitle">Manually add environment</span>
+                        <button class="btn--icon" id="btnCloseAddPanel">
+                            <svg width="12" height="12" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.5"/></svg>
+                        </button>
                     </div>
-                    <p class="add-env-panel__desc" data-i18n="home.addPanel.desc">
-                        Enter a command name to detect. LazyEnv will attempt to identify the tool and its version.
-                    </p>
-                    <div class="add-env-form">
-                        <div class="add-env-form__row">
-                            <label data-i18n="home.addPanel.commandLabel">Command</label>
-                            <input type="text" id="addEnvCommand" data-i18n-placeholder="home.addPanel.commandPlaceholder" placeholder="e.g. python, node, rustc, gcc" autocomplete="off">
+                    <div class="add-panel__row">
+                        <div class="form-group">
+                            <input type="text" class="input input--mono" id="addEnvCmd" data-i18n-placeholder="home.addCmdPlaceholder">
                         </div>
-                        <div class="add-env-form__row">
-                            <label data-i18n="home.addPanel.categoryLabel">Category</label>
-                            <select id="addEnvCategory">
-                                <option value="language" data-i18n="category.language">Language / Runtime</option>
-                                <option value="tool" data-i18n="category.tool">Build Tool</option>
-                                <option value="runtime" data-i18n="category.runtime">Container / VM</option>
-                                <option value="utility" data-i18n="category.utility">Utility</option>
-                                <option value="editor" data-i18n="category.editor">Editor / IDE</option>
-                                <option value="database" data-i18n="category.database">Database</option>
-                                <option value="other" data-i18n="category.other">Other</option>
+                        <div class="form-group" style="max-width:140px">
+                            <select class="input" id="addEnvCategory">
+                                <option value="language">Language</option>
+                                <option value="tool">Tool</option>
+                                <option value="runtime">Runtime</option>
+                                <option value="editor">Editor</option>
+                                <option value="database">Database</option>
+                                <option value="other">Other</option>
                             </select>
                         </div>
-                        <div class="add-env-form__actions">
-                            <button class="btn btn--primary btn--sm" id="btnProbeEnv" data-i18n="home.addPanel.btnDetect">Detect</button>
-                            <span class="add-env-form__status" id="probeStatus"></span>
-                        </div>
+                        <button class="btn btn--accent" id="btnDetectEnv" data-i18n="home.detect">Detect</button>
                     </div>
                 </div>
 
-                <div id="envContainer">
-                    <div class="skeleton skeleton-card"></div>
-                    <div class="skeleton skeleton-card"></div>
-                    <div class="skeleton skeleton-card"></div>
-                </div>
+                <div id="envList"></div>
             </div>
 
-            <!-- System Check -->
-            <div class="page" id="page-check" data-page="check">
-                <div class="page-header">
-                    <h1 class="page-header__title" data-i18n="check.title">System Check</h1>
-                    <p class="page-header__desc" data-i18n="check.desc">
-                        Verifying system requirements before setup.
-                    </p>
-                </div>
-                <div class="info-box" data-i18n="check.infoBox">
-                    LazyEnv creates an automatic snapshot of your environment variables before
-                    making any changes. You can restore at any time from the Recovery page.
-                </div>
-                <div class="check-list" id="checkList"></div>
-            </div>
+            <!-- ==================== SETTINGS ==================== -->
+            <div class="page" id="page-settings">
+                <h1 class="page-title" data-i18n="settings.title">Settings</h1>
+                <p class="page-desc" data-i18n="settings.desc">Manage environment variables directly. Changes take effect immediately.</p>
 
-            <!-- Package Selection -->
-            <div class="page" id="page-packages" data-page="packages">
-                <div class="page-header">
-                    <h1 class="page-header__title" data-i18n="packages.title">Select Packages</h1>
-                    <p class="page-header__desc" data-i18n="packages.desc">
-                        Choose development tools to install. PATH will be configured automatically.
-                    </p>
+                <div class="info-box info-box--info mb-lg">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;margin-top:2px;color:var(--accent)"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12zm-.5-9h1v1h-1V5zm0 2h1v4h-1V7z"/></svg>
+                    <span data-i18n="settings.snapshotHint">A snapshot will be automatically created before any modification for safe rollback.</span>
                 </div>
+
+                <div class="tabs" id="envvarTabs">
+                    <button class="tab tab--active" data-scope="user" data-i18n="settings.userVars">User Variables</button>
+                    <button class="tab" data-scope="system" data-i18n="settings.systemVars">System Variables</button>
+                </div>
+
                 <div class="toolbar">
-                    <input type="text" class="toolbar__search" id="pkgSearch" data-i18n-placeholder="packages.searchPlaceholder" placeholder="Search packages...">
-                    <button class="btn btn--primary btn--sm" id="btnStartInstall" disabled>
-                        <span data-i18n="packages.btnInstall">Install Selected (0)</span>
+                    <button class="btn btn--accent" id="btnAddEnvVar">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+                        <span data-i18n="settings.addNew">New Variable</span>
+                    </button>
+                    <div class="toolbar__spacer"></div>
+                    <div class="toolbar__search-wrap">
+                        <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                        <input type="text" class="toolbar__search" id="envvarSearch" data-i18n-placeholder="settings.searchPlaceholder">
+                    </div>
+                </div>
+
+                <div class="envvar-table-wrap">
+                    <table class="data-table" id="envvarTable">
+                        <thead>
+                            <tr>
+                                <th data-i18n="settings.colName">Name</th>
+                                <th data-i18n="settings.colValue">Value</th>
+                                <th data-i18n="settings.colActions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="envvarBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ==================== SYSTEM CHECK ==================== -->
+            <div class="page" id="page-syscheck">
+                <h1 class="page-title" data-i18n="syscheck.title">System Check</h1>
+                <p class="page-desc" data-i18n="syscheck.desc">Verify system prerequisites before installation.</p>
+
+                <div class="card" id="checkResults"></div>
+
+                <div class="mt-lg">
+                    <button class="btn" id="btnRunChecks">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                        <span data-i18n="syscheck.rerun">Re-run Checks</span>
                     </button>
                 </div>
-                <div id="catalogContainer"></div>
             </div>
 
-            <!-- Installation -->
-            <div class="page" id="page-install" data-page="install">
-                <div class="page-header">
-                    <h1 class="page-header__title" data-i18n="install.title">Installation</h1>
-                    <p class="page-header__desc" data-i18n="install.desc">
-                        Installing packages via winget with real-time progress.
-                    </p>
-                </div>
-                <div class="install-progress" id="installProgressWrap" style="display:none;">
-                    <div class="install-progress__bar-wrap">
-                        <div class="install-progress__bar" id="installBar"></div>
-                    </div>
-                    <div class="install-progress__text">
-                        <span id="installProgressText">0 / 0</span>
-                        <span id="installProgressPct">0%</span>
-                    </div>
-                </div>
-                <div class="info-box" id="installSnapshotInfo" style="display:none;"></div>
-                <div class="progress-list" id="progressList">
-                    <div class="empty-state">
-                        <div class="empty-state__text" data-i18n="install.emptyState">Select packages and start installation from the Packages page.</div>
-                    </div>
-                </div>
-            </div>
+            <!-- ==================== PACKAGES ==================== -->
+            <div class="page" id="page-packages">
+                <h1 class="page-title" data-i18n="packages.title">Packages</h1>
+                <p class="page-desc" data-i18n="packages.desc">Select development tools to install.</p>
 
-            <!-- Recovery -->
-            <div class="page" id="page-recovery" data-page="recovery">
-                <div class="page-header">
-                    <h1 class="page-header__title" data-i18n="recovery.title">Recovery & Snapshots</h1>
-                    <p class="page-header__desc" data-i18n="recovery.desc">
-                        Manage environment variable snapshots. Restore to any previous state.
-                    </p>
-                </div>
                 <div class="toolbar">
-                    <button class="btn btn--primary btn--sm" id="btnCreateSnapshot">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                        <span data-i18n="recovery.btnCreate">Create Snapshot</span>
-                    </button>
-                    <button class="btn btn--secondary btn--sm" id="btnImportSnapshot">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/></svg>
-                        <span data-i18n="recovery.btnImport">Import</span>
-                    </button>
-                    <button class="btn btn--secondary btn--sm" id="btnRefreshSnapshots" data-i18n="recovery.btnRefresh">Refresh</button>
-                </div>
-                <div class="snapshot-list" id="snapshotList">
-                    <div class="empty-state">
-                        <div class="empty-state__text" data-i18n="recovery.emptyState">No snapshots yet.</div>
+                    <button class="btn" id="btnSelectAll" data-i18n="packages.selectAll">Select All</button>
+                    <button class="btn" id="btnDeselectAll" data-i18n="packages.deselectAll">Deselect All</button>
+                    <div class="toolbar__spacer"></div>
+                    <div class="toolbar__search-wrap">
+                        <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                        <input type="text" class="toolbar__search" id="pkgSearch" data-i18n-placeholder="packages.searchPlaceholder">
                     </div>
+                </div>
+
+                <div id="packageList"></div>
+
+                <div class="mt-lg flex-between">
+                    <span id="pkgSelectedCount" class="text-secondary"></span>
+                    <button class="btn btn--accent" id="btnStartInstall" data-i18n="packages.startInstall">Start Installation</button>
                 </div>
             </div>
 
-            <!-- Summary -->
-            <div class="page" id="page-summary" data-page="summary">
-                <div class="page-header">
-                    <h1 class="page-header__title" data-i18n="summary.title">Summary</h1>
-                    <p class="page-header__desc" data-i18n="summary.desc">
-                        Overview of all changes made during this session.
-                    </p>
+            <!-- ==================== INSTALL ==================== -->
+            <div class="page" id="page-install">
+                <h1 class="page-title" data-i18n="install.title">Installation</h1>
+                <p class="page-desc" data-i18n="install.desc">Installing selected packages...</p>
+
+                <div class="flex-between mb-md">
+                    <span id="installProgress" class="text-secondary"></span>
+                    <span id="installPercent" class="text-accent" style="font-weight:600"></span>
                 </div>
-                <div class="info-box info-box--success" id="summaryInfo" data-i18n="summary.infoBox">
-                    All operations completed. A snapshot was created before installation.
+                <div class="progress-bar" id="installProgressBar">
+                    <div class="progress-bar__fill" id="installProgressFill" style="width:0%"></div>
                 </div>
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th data-i18n="summary.colPackage">Package</th>
-                            <th data-i18n="summary.colStatus">Status</th>
-                            <th data-i18n="summary.colCommand">Command</th>
-                            <th data-i18n="summary.colDetails">Details</th>
-                        </tr>
-                    </thead>
-                    <tbody id="summaryBody">
-                        <tr><td colspan="4" style="text-align:center;color:var(--text-tertiary);" data-i18n="summary.emptyState">No installation data yet.</td></tr>
-                    </tbody>
-                </table>
+
+                <div id="installList" class="mt-lg"></div>
+            </div>
+
+            <!-- ==================== RECOVERY ==================== -->
+            <div class="page" id="page-recovery">
+                <h1 class="page-title" data-i18n="recovery.title">Recovery</h1>
+                <p class="page-desc" data-i18n="recovery.desc">Manage environment snapshots. Restore previous states or import/export configurations.</p>
+
+                <div class="toolbar">
+                    <button class="btn" id="btnCreateSnapshot">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+                        <span data-i18n="recovery.create">Create Snapshot</span>
+                    </button>
+                    <button class="btn" id="btnImportSnapshot">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V10.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+                        <span data-i18n="recovery.import">Import</span>
+                    </button>
+                </div>
+
+                <div id="snapshotList"></div>
+            </div>
+
+            <!-- ==================== SUMMARY ==================== -->
+            <div class="page" id="page-summary">
+                <h1 class="page-title" data-i18n="summary.title">Summary</h1>
+                <p class="page-desc" data-i18n="summary.desc">Installation results overview.</p>
+
+                <div id="summaryContent"></div>
             </div>
 
         </div>
-    </div>
-
+    </main>
 </div>
+
+<!-- Dialog Overlay -->
+<div class="dialog-overlay" id="dialogOverlay">
+    <div class="dialog" id="dialogBox">
+        <div class="dialog__header">
+            <div class="dialog__title" id="dialogTitle"></div>
+        </div>
+        <div class="dialog__body" id="dialogBody"></div>
+        <div class="dialog__footer" id="dialogFooter"></div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
 
 <script src="i18n.js"></script>
 <script src="script.js"></script>
