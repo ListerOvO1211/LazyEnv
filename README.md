@@ -4,7 +4,7 @@
 
 **Cross-platform, recoverable, zero-pollution questionnaire-style development environment configuration tool.**
 
-Version: 0.1.0
+Version: 0.2.0
 
 ---
 

@@ -222,7 +222,7 @@
                     found: true,
                     name: obj.command,
                     command: obj.command,
-                    version: obj.command + " 0.1.0 (mock)",
+                    version: obj.command + " 0.2.0 (mock)",
                     category: obj.category || "other"
                 });
             }, 600);
